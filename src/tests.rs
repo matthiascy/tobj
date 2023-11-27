@@ -12,7 +12,7 @@ const CORNELL_BOX_MTL1: &'static str = include_str!("../obj/cornell_box.mtl");
 const CORNELL_BOX_MTL2: &'static str = include_str!("../obj/cornell_box2.mtl");
 
 // Set the tolerance for float comparison
-use crate::Float;
+use crate::{Float, NormalTexture};
 const TOL: Float = 0.0000001;
 
 #[test]
@@ -419,7 +419,7 @@ fn validate_cornell(models: Vec<tobj::Model>, mats: Vec<tobj::Material>) {
     );
     assert_eq!(
         mat.normal_texture,
-        Some("this normal texture has spaces.jpg".to_owned())
+        Some(NormalTexture::BumpMap("this normal texture has spaces.jpg".to_owned()))
     );
     assert_eq!(
         mat.shininess_texture,
@@ -461,7 +461,7 @@ fn validate_cornell(models: Vec<tobj::Model>, mats: Vec<tobj::Material>) {
     assert_eq!(mat.ambient_texture, Some("dummy_texture.png".to_owned()));
     assert_eq!(mat.diffuse_texture, Some("dummy_texture.png".to_owned()));
     assert_eq!(mat.specular_texture, Some("dummy_texture.png".to_owned()));
-    assert_eq!(mat.normal_texture, Some("dummy_texture.png".to_owned()));
+    assert_eq!(mat.normal_texture, Some(NormalTexture::BumpMap("dummy_texture.png".to_owned())));
     assert_eq!(mat.shininess_texture, Some("dummy_texture.png".to_owned()));
     assert_eq!(mat.dissolve_texture, Some("dummy_texture.png".to_owned()));
 }

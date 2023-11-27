@@ -1,3 +1,5 @@
+use tobj::NormalTexture;
+
 fn main() {
     let obj_file = std::env::args()
         .skip(1)
@@ -109,7 +111,14 @@ fn main() {
             println!("    material.map_Ns = {}", shininess_texture);
         }
         if let Some(normal_texture) = &m.normal_texture {
-            println!("    material.map_Bump = {}", normal_texture);
+            match normal_texture {
+                NormalTexture::BumpMap(tex) => {
+                    println!("    material.map_Bump = {}", tex);
+                }
+                NormalTexture::NormalMap(tex) => {
+                    println!("    material.map_Norm = {}", tex);
+                }
+            }
         }
         if let Some(dissolve_texture) = &m.dissolve_texture {
             println!("    material.map_d = {}", dissolve_texture);

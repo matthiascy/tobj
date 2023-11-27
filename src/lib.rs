@@ -230,6 +230,7 @@ use std::{
     path::Path,
     str::{FromStr, SplitWhitespace},
 };
+use std::fmt::{Debug, Display, Formatter};
 
 #[cfg(feature = "use_f64")]
 type Float = f64;
@@ -528,7 +529,7 @@ impl LoadOptions {
         // A = single_index, B = merge_identical_points, C = reorder_data
         // (A ∧ ¬B) ∨ (A ∧ ¬C) -> A ∧ ¬(B ∨ C)
         #[allow(unused_mut)]
-        let mut other_flags = false;
+            let mut other_flags = false;
 
         #[cfg(feature = "merging")]
         {
@@ -597,7 +598,7 @@ pub struct Material {
     /// Name of the specular texture file for the material.
     pub specular_texture: Option<String>,
     /// Name of the normal map texture file for the material.
-    pub normal_texture: Option<String>,
+    pub normal_texture: Option<NormalTexture>,
     /// Name of the shininess map texture file for the material.
     pub shininess_texture: Option<String>,
     /// Name of the alpha/opacity map texture file for the material.
@@ -610,6 +611,23 @@ pub struct Material {
     /// Key value pairs of any unrecognized parameters encountered while parsing
     /// the material.
     pub unknown_param: HashMap<String, String>,
+}
+
+/// Normal texture type.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NormalTexture {
+    BumpMap(String),
+    NormalMap(String),
+}
+
+impl Display for NormalTexture {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            NormalTexture::BumpMap(s) | NormalTexture::NormalMap(s) => {
+                std::fmt::Display::fmt(s, f)
+            }
+        }
+    }
 }
 
 /// Possible errors that may occur while loading `OBJ` and `MTL` files.
@@ -1019,10 +1037,10 @@ fn add_vertex_multi_index(
 
                 texcoord_indices.push(0);
                 texcoord_index_map.insert(0, 0);
-            // We use the previous index. Not great a fallback but less prone to
-            // cause issues. FIXME: we should probably check if the
-            // data is per-vertex-per-face and if so calculate the
-            // average from adjacent face vertices.
+                // We use the previous index. Not great a fallback but less prone to
+                // cause issues. FIXME: we should probably check if the
+                // data is per-vertex-per-face and if so calculate the
+                // average from adjacent face vertices.
             } else {
                 texcoord_indices.push(*texcoord_indices.last().unwrap());
             }
@@ -1060,10 +1078,10 @@ fn add_vertex_multi_index(
 
                 normal_indices.push(0);
                 normal_index_map.insert(0, 0);
-            // We use the previous index. Not great a fallback but less prone to
-            // cause issues. FIXME: we should probably check if the
-            // data is per-vertex-per-face and if so calculate the
-            // average from adjacent face vertices.
+                // We use the previous index. Not great a fallback but less prone to
+                // cause issues. FIXME: we should probably check if the
+                // data is per-vertex-per-face and if so calculate the
+                // average from adjacent face vertices.
             } else {
                 normal_indices.push(*normal_indices.last().unwrap());
             }
@@ -1483,8 +1501,8 @@ fn reorder_data(mesh: &mut Mesh) {
 #[cfg(feature = "merging")]
 #[inline]
 fn merge_identical_points<const N: usize>(points: &mut Vec<Float>, indices: &mut Vec<u32>)
-where
-    [(); size_of::<[Float; N]>()]:,
+    where
+        [(); size_of::<[Float; N]>()]:,
 {
     if indices.is_empty() {
         return;
@@ -1536,8 +1554,8 @@ where
 /// * `load_options` – Governs on-the-fly processing of the mesh during loading.
 ///   See [`LoadOptions`] for more information.
 pub fn load_obj<P>(file_name: P, load_options: &LoadOptions) -> LoadResult
-where
-    P: AsRef<Path> + fmt::Debug,
+    where
+        P: AsRef<Path> + fmt::Debug,
 {
     let file = match File::open(file_name.as_ref()) {
         Ok(f) => f,
@@ -1564,8 +1582,8 @@ where
 /// Returns a pair with a `Vec` holding all loaded materials and a `HashMap`
 /// containing a mapping of material names to indices in the Vec.
 pub fn load_mtl<P>(file_name: P) -> MTLLoadResult
-where
-    P: AsRef<Path> + fmt::Debug,
+    where
+        P: AsRef<Path> + fmt::Debug,
 {
     let file = match File::open(file_name.as_ref()) {
         Ok(f) => f,
@@ -1640,9 +1658,9 @@ pub fn load_obj_buf<B, ML>(
     load_options: &LoadOptions,
     material_loader: ML,
 ) -> LoadResult
-where
-    B: BufRead,
-    ML: Fn(&Path) -> MTLLoadResult,
+    where
+        B: BufRead,
+        ML: Fn(&Path) -> MTLLoadResult,
 {
     if !load_options.is_valid() {
         return Err(LoadError::InvalidLoadOptionConfig);
@@ -1882,36 +1900,15 @@ pub fn load_mtl_buf<B: BufRead>(reader: &mut B) -> MTLLoadResult {
             Some("Ns") => cur_mat.shininess = Some(parse_float(words.next())?),
             Some("Ni") => cur_mat.optical_density = Some(parse_float(words.next())?),
             Some("d") => cur_mat.dissolve = Some(parse_float(words.next())?),
-            Some("map_Ka") => match line.get(6..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.ambient_texture = Some(tex.to_owned()),
-            },
-            Some("map_Kd") => match line.get(6..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.diffuse_texture = Some(tex.to_owned()),
-            },
-            Some("map_Ks") => match line.get(6..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.specular_texture = Some(tex.to_owned()),
-            },
-            Some("map_Bump") | Some("map_bump") => match line.get(8..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.normal_texture = Some(tex.to_owned()),
-            },
-            Some("map_Ns") | Some("map_ns") | Some("map_NS") => {
-                match line.get(6..).map(str::trim) {
-                    Some("") | None => return Err(LoadError::MaterialParseError),
-                    Some(tex) => cur_mat.shininess_texture = Some(tex.to_owned()),
-                }
-            }
-            Some("bump") => match line.get(4..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.normal_texture = Some(tex.to_owned()),
-            },
-            Some("map_d") => match line.get(5..).map(str::trim) {
-                Some("") | None => return Err(LoadError::MaterialParseError),
-                Some(tex) => cur_mat.dissolve_texture = Some(tex.to_owned()),
-            },
+            Some("map_Ka") => cur_mat.ambient_texture = Some(parse_material_property(6, line, words)?.to_owned()),
+            Some("map_Kd") => cur_mat.diffuse_texture = Some(parse_material_property(6, line, words)?.to_owned()),
+            Some("map_Ks") => cur_mat.specular_texture = Some(parse_material_property(6, line, words)?.to_owned()),
+            Some("map_Bump") | Some("map_bump") => cur_mat.normal_texture = Some(NormalTexture::BumpMap(parse_material_property(8, line, words)?.to_owned())),
+            Some("map_Norm") | Some("map_norm") => cur_mat.normal_texture = Some(NormalTexture::NormalMap(parse_material_property(8, line, words)?.to_owned())),
+            Some("map_Ns") | Some("map_ns") | Some("map_NS") => cur_mat.shininess_texture = Some(parse_material_property(6, line, words)?.to_owned()),
+            Some("bump") => cur_mat.normal_texture = Some(NormalTexture::BumpMap(parse_material_property(4, line, words)?.to_owned())),
+            Some("norm") | Some("Norm") | Some("NORM") => cur_mat.normal_texture = Some(NormalTexture::NormalMap(parse_material_property(4, line, words)?.to_owned())),
+            Some("map_d") => cur_mat.dissolve_texture = Some(parse_material_property(5, line, words)?.to_owned()),
             Some("illum") => {
                 if let Some(p) = words.next() {
                     match FromStr::from_str(p) {
@@ -1924,8 +1921,7 @@ pub fn load_mtl_buf<B: BufRead>(reader: &mut B) -> MTLLoadResult {
             }
             Some(unknown) => {
                 if !unknown.is_empty() {
-                    let param = line[unknown.len()..].trim().to_owned();
-                    cur_mat.unknown_param.insert(unknown.to_owned(), param);
+                    cur_mat.unknown_param.insert(unknown.to_owned(), parse_material_property(unknown.len(), line, words)?.to_owned());
                 }
             }
         }
@@ -1938,6 +1934,29 @@ pub fn load_mtl_buf<B: BufRead>(reader: &mut B) -> MTLLoadResult {
     }
 
     Ok((materials, mat_map))
+}
+
+/// Parses a property of a material.
+///
+/// If the material property is a texture map statement, the function will
+/// strip off the options for texture map statements:
+///
+/// IN: -bm 1.0 -o 1 1 1 -s 1 1 1 -mm 0 1 test.png
+/// OUT: test.png
+///
+/// IN: -blendu on -blendv on -clamp on -imfchan r -mm 0 1 test.png
+/// OUT: test.png
+fn parse_material_property<'a>(prop_ends: usize, line: &'a str, mut words: SplitWhitespace<'a>) -> Result<&'a str, LoadError> {
+    let last = words.next_back();
+    for word in words {
+        if word.starts_with('-') {
+            return match last {
+                None => Err(LoadError::MaterialParseError),
+                Some(tex) => Ok(tex),
+            };
+        }
+    }
+    return Ok(line[prop_ends..].trim());
 }
 
 #[cfg(feature = "async")]
@@ -2004,10 +2023,10 @@ pub async fn load_obj_buf_async<B, ML, MLFut>(
     load_options: &LoadOptions,
     material_loader: ML,
 ) -> LoadResult
-where
-    B: BufRead,
-    ML: Fn(String) -> MLFut,
-    MLFut: Future<Output = MTLLoadResult>,
+    where
+        B: BufRead,
+        ML: Fn(String) -> MLFut,
+        MLFut: Future<Output=MTLLoadResult>,
 {
     if !load_options.is_valid() {
         return Err(LoadError::InvalidLoadOptionConfig);
